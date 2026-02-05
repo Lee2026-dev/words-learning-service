@@ -2,6 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Body
 from sqlmodel import Session, select, SQLModel
 from typing import List, Optional
 import uuid
+import time
+import logging
+
+logger = logging.getLogger("api.words")
 
 from app.database import get_session
 from app.models import Word
@@ -14,7 +18,13 @@ def get_words(session: Session = Depends(get_session), limit: int = 100, offset:
     Return list of saved words (sorted by newest).
     """
     statement = select(Word).order_by(Word.timestamp.desc()).offset(offset).limit(limit)
-    return session.exec(statement).all()
+    
+    t0 = time.time()
+    results = session.exec(statement).all()
+    duration = time.time() - t0
+    logger.info(f"DB Query (get_words) took: {duration:.4f}s")
+    
+    return results
 
 @router.post("", response_model=Word)
 def create_word(word_data: Word, session: Session = Depends(get_session)):
@@ -23,9 +33,12 @@ def create_word(word_data: Word, session: Session = Depends(get_session)):
     If duplicate exists, returns the existing one (idempotent).
     """
     # Check for duplicate
+    t0 = time.time()
     statement = select(Word).where(Word.original == word_data.original)
     existing_word = session.exec(statement).first()
     if existing_word:
+        duration = time.time() - t0
+        logger.info(f"DB Check (duplicate) took: {duration:.4f}s")
         return existing_word
 
     # Create new
@@ -33,6 +46,8 @@ def create_word(word_data: Word, session: Session = Depends(get_session)):
     session.add(word_data)
     session.commit()
     session.refresh(word_data)
+    duration = time.time() - t0
+    logger.info(f"DB Create (create_word) took: {duration:.4f}s")
     return word_data
 
 @router.delete("/{word_id}")

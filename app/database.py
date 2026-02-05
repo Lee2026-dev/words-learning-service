@@ -22,9 +22,9 @@ else:
 
 engine = create_engine(
     DATABASE_URL, 
-    echo=True, 
+    # echo=True, 
     connect_args=connect_args,
-    pool_pre_ping=True # Automatically reconnect if connection drops
+    pool_pre_ping=False # Automatically reconnect if connection drops
 )
 
 def get_session():

@@ -1,5 +1,15 @@
 from fastapi import FastAPI, Request
 import time
+import logging
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("api.timing")
+
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import create_db_and_tables
 from app.api import words, settings, translate
@@ -17,6 +27,7 @@ async def add_process_time_header(request: Request, call_next):
     response = await call_next(request)
     process_time = time.time() - start_time
     response.headers["X-Process-Time"] = str(process_time)
+    logger.info(f"Request: {request.method} {request.url.path} completed in {process_time:.4f}s")
     return response
 
 # CORS Configuration
@@ -46,4 +57,5 @@ def read_root():
     return {"status": "ok", "service": "LinguaLearn API"}
 
 if __name__ == "__main__":
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8001, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=True)

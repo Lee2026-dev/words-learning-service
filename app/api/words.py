@@ -13,11 +13,24 @@ from app.models import Word
 router = APIRouter(prefix="/words", tags=["words"])
 
 @router.get("", response_model=List[Word])
-def get_words(session: Session = Depends(get_session), limit: int = 100, offset: int = 0):
+def get_words(
+    session: Session = Depends(get_session), 
+    limit: int = 100, 
+    offset: int = 0,
+    start_time: Optional[float] = None,
+    end_time: Optional[float] = None
+):
     """
     Return list of saved words (sorted by newest).
     """
-    statement = select(Word).order_by(Word.timestamp.desc()).offset(offset).limit(limit)
+    query = select(Word)
+    
+    if start_time:
+        query = query.where(Word.timestamp >= start_time)
+    if end_time:
+        query = query.where(Word.timestamp <= end_time)
+        
+    statement = query.order_by(Word.timestamp.desc()).offset(offset).limit(limit)
     
     t0 = time.time()
     results = session.exec(statement).all()

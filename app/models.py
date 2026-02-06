@@ -7,6 +7,7 @@ class Word(SQLModel, table=True):
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     original: str = Field(index=True)  # Index for faster duplicate checks
     translation: str
+    phonetic: Optional[str] = None
     context: Optional[str] = None
     url: Optional[str] = None
     timestamp: float = Field(default_factory=lambda: datetime.now().timestamp())

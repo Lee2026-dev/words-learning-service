@@ -75,6 +75,7 @@ def delete_word(word_id: uuid.UUID, session: Session = Depends(get_session)):
 class WordUpdate(SQLModel):
     original: Optional[str] = None
     translation: Optional[str] = None
+    phonetic: Optional[str] = None
     context: Optional[str] = None
     url: Optional[str] = None
     learned: Optional[bool] = None

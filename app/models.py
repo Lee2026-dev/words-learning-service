@@ -18,3 +18,4 @@ class Settings(SQLModel, table=True):
     target_language: str = "zh"
     highlight_enabled: bool = True
     immersion_mode: bool = False
+    youtube_subtitles_enabled: bool = True

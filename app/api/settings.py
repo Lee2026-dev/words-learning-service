@@ -27,10 +27,11 @@ def update_settings(settings_data: Settings, session: Session = Depends(get_sess
     if not db_settings:
         db_settings = Settings(id=1)
     
-    # Update fields
-    db_settings.target_language = settings_data.target_language
-    db_settings.highlight_enabled = settings_data.highlight_enabled
-    db_settings.immersion_mode = settings_data.immersion_mode
+    # Update fields dynamically
+    settings_dict = settings_data.model_dump(exclude_unset=True)
+    for key, value in settings_dict.items():
+        if key != "id" and hasattr(db_settings, key):
+            setattr(db_settings, key, value)
     
     session.add(db_settings)
     session.commit()

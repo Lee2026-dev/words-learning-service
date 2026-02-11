@@ -8,10 +8,85 @@ import logging
 logger = logging.getLogger("api.words")
 
 from app.database import get_session
+from app.gemini_service import lookup_word
+
 from app.models import Word
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/words", tags=["words"])
 
+class SaveRequest(BaseModel):
+    text: str
+
+@router.post("/save", response_model=Word)
+async def save_word(request: SaveRequest, session: Session = Depends(get_session)):
+    """
+    Mark a word as starred.
+    If word exists, update star=True.
+    If word doesn't exist, fetch from Gemini, create it with star=True.
+    """
+    # Check if word exists
+    statement = select(Word).where(Word.original == request.text)
+    existing_word = session.exec(statement).first()
+    
+    if existing_word:
+        existing_word.star = True
+        session.add(existing_word)
+        session.commit()
+        session.refresh(existing_word)
+        return existing_word
+        
+    # If not exists, fetch and create
+    # We default target_lang to 'Chinese' for enrichment or we could accept it in request. 
+    # For simplicity, default to Chinese context as per app Settings default.
+    target_lang = "Chinese" 
+    
+    try:
+        data = await lookup_word(request.text, target_lang)
+        
+        # Extract fields similar to /translate logic
+        final_meanings = data.get("meanings", [])
+        
+        # Helper to find a simple translation
+        simple_translation = data.get("word", request.text)
+        if isinstance(final_meanings, list) and len(final_meanings) > 0:
+            first_meaning = final_meanings[0]
+            if isinstance(first_meaning, dict):
+                defs = first_meaning.get("definitions", [])
+                if isinstance(defs, list) and len(defs) > 0:
+                    first_def = defs[0]
+                    if isinstance(first_def, dict):
+                        simple_translation = first_def.get("definition", simple_translation)
+                    elif isinstance(first_def, str):
+                        simple_translation = first_def
+
+        new_word = Word(
+            original=request.text,
+            translation=simple_translation,
+            phonetic=data.get("phonetic"),
+            meanings=final_meanings,
+            phonetics=[],
+            audio_url=None,
+            learned=False,
+            star=True
+        )
+        session.add(new_word)
+        session.commit()
+        session.refresh(new_word)
+        return new_word
+        
+    except Exception as e:
+        logger.error(f"Failed to fetch/save word '{request.text}': {e}")
+        # Fallback: create a basic entry if AI fails
+        fallback_word = Word(
+            original=request.text,
+            translation=request.text,
+            star=True
+        )
+        session.add(fallback_word)
+        session.commit()
+        session.refresh(fallback_word)
+        return fallback_word
 @router.get("", response_model=List[Word])
 def get_words(
     session: Session = Depends(get_session), 
@@ -23,7 +98,7 @@ def get_words(
     """
     Return list of saved words (sorted by newest).
     """
-    query = select(Word)
+    query = select(Word).where(Word.star == True)
     
     if start_time:
         query = query.where(Word.timestamp >= start_time)
@@ -79,6 +154,7 @@ class WordUpdate(SQLModel):
     context: Optional[str] = None
     url: Optional[str] = None
     learned: Optional[bool] = None
+    star: Optional[bool] = None
 
 @router.patch("/{word_id}", response_model=Word)
 def update_word(word_id: uuid.UUID, word_update: WordUpdate, session: Session = Depends(get_session)):

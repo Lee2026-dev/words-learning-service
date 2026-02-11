@@ -16,6 +16,7 @@ class Word(SQLModel, table=True):
     url: Optional[str] = None
     timestamp: float = Field(default_factory=lambda: datetime.now().timestamp())
     learned: bool = Field(default=False)
+    star: bool = Field(default=False)
 
 class Settings(SQLModel, table=True):
     id: Optional[int] = Field(default=1, primary_key=True)

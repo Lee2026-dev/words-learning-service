@@ -15,18 +15,17 @@ from pydantic import BaseModel
 
 router = APIRouter(prefix="/words", tags=["words"])
 
-class SaveRequest(BaseModel):
-    text: str
 
-@router.post("/save", response_model=Word)
-async def save_word(request: SaveRequest, session: Session = Depends(get_session)):
+
+@router.post("", response_model=Word)
+async def save_word(request: Word, session: Session = Depends(get_session)):
     """
     Mark a word as starred.
     If word exists, update star=True.
     If word doesn't exist, fetch from Gemini, create it with star=True.
     """
     # Check if word exists
-    statement = select(Word).where(Word.original == request.text)
+    statement = select(Word).where(Word.original == request.original)
     existing_word = session.exec(statement).first()
     
     if existing_word:
@@ -34,6 +33,7 @@ async def save_word(request: SaveRequest, session: Session = Depends(get_session
         session.add(existing_word)
         session.commit()
         session.refresh(existing_word)
+        logger.info(f"Word '{request.original}' already exists, marked as starred.")
         return existing_word
         
     # If not exists, fetch and create
@@ -42,13 +42,13 @@ async def save_word(request: SaveRequest, session: Session = Depends(get_session
     target_lang = "Chinese" 
     
     try:
-        data = await lookup_word(request.text, target_lang)
+        data = await lookup_word(request.original, target_lang)
         
         # Extract fields similar to /translate logic
         final_meanings = data.get("meanings", [])
         
         # Helper to find a simple translation
-        simple_translation = data.get("word", request.text)
+        simple_translation = data.get("word", request.original)
         if isinstance(final_meanings, list) and len(final_meanings) > 0:
             first_meaning = final_meanings[0]
             if isinstance(first_meaning, dict):
@@ -61,7 +61,7 @@ async def save_word(request: SaveRequest, session: Session = Depends(get_session
                         simple_translation = first_def
 
         new_word = Word(
-            original=request.text,
+            original=request.original,
             translation=simple_translation,
             phonetic=data.get("phonetic"),
             meanings=final_meanings,
@@ -73,14 +73,15 @@ async def save_word(request: SaveRequest, session: Session = Depends(get_session
         session.add(new_word)
         session.commit()
         session.refresh(new_word)
+        logger.info(f"Word '{request.original}' not found, fetched from Gemini and saved.")
         return new_word
         
     except Exception as e:
-        logger.error(f"Failed to fetch/save word '{request.text}': {e}")
+        logger.error(f"Failed to fetch/save word '{request.original}': {e}")
         # Fallback: create a basic entry if AI fails
         fallback_word = Word(
-            original=request.text,
-            translation=request.text,
+            original=request.original,
+            translation=request.original,
             star=True
         )
         session.add(fallback_word)
@@ -114,7 +115,7 @@ def get_words(
     
     return results
 
-@router.post("", response_model=Word)
+@router.post("/save", response_model=Word)
 def create_word(word_data: Word, session: Session = Depends(get_session)):
     """
     Save a new word. Checks for duplicates by 'original' text.
@@ -139,13 +140,14 @@ def create_word(word_data: Word, session: Session = Depends(get_session)):
     return word_data
 
 @router.delete("/{word_id}")
-def delete_word(word_id: uuid.UUID, session: Session = Depends(get_session)):
+def unstar_word(word_id: uuid.UUID, session: Session = Depends(get_session)):
     word = session.get(Word, word_id)
     if not word:
         raise HTTPException(status_code=404, detail="Word not found")
-    session.delete(word)
+    word.star = False
+    session.add(word)
     session.commit()
-    return {"message": "Word deleted"}
+    return {"message": "Word unstarred"}
 
 class WordUpdate(SQLModel):
     original: Optional[str] = None

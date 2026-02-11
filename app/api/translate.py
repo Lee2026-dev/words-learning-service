@@ -29,11 +29,11 @@ class TranslateResponse(BaseModel):
 async def translate_text(request: TranslateRequest, session: Session = Depends(get_session)):
     # Determine target language specific name for the prompt
     target_lang_name = "Chinese"
-    if request.target_lang.lower().startswith("zh"):
-        target_lang_name = "Chinese"
-    else:
-        # Fallback for other languages, though the prompt is optimized for Chinese
-        target_lang_name = request.target_lang
+    # if request.target_lang.lower().startswith("zh"):
+    #     target_lang_name = "Chinese"
+    # else:
+    #     # Fallback for other languages, though the prompt is optimized for Chinese
+    #     target_lang_name = request.target_lang
 
     try:
         if is_single_word(request.text):

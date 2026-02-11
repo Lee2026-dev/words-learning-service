@@ -1,5 +1,7 @@
 # Prompt Templates for Gemini Translation and Dictionary Service
 
+
+
 DICTIONARY_PROMPT_TEMPLATE = """
 You are a professional English-{target_lang} dictionary.
 
@@ -11,12 +13,7 @@ Return ONLY valid JSON in this exact format:
   "meanings": [
     {{
       "partOfSpeech": "",
-      "definitions": [
-        {{
-          "definition": "",
-          "example": ""
-        }}
-      ]
+      "definitions": ["", "", ""]
     }}
   ]
 }}
@@ -27,6 +24,7 @@ Rules:
 - No explanations.
 - No markdown.
 - No comments.
+- The partOfSpeech should be abbreviation
 
 Word: {word}
 """
